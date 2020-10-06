@@ -48,7 +48,7 @@ Usage:
    pylab.show()
    ```
 
-   A comparison with other SEOBNRv(1,2,3,4) waveforms can be found in [test/prod1_wfoffset_SEOBcomp.html](https://yi-fan-wang.github.io/pycbc-waveform-SEOBNRE/test/prod1_wfoffset_SEOBcomp.html) (Note that SEOBNRE waveforms are different with others up to a coalescence phase offset).
+   A comparison with other SEOBNRv(1,2,3,4) waveforms can be found in [test/prod1_wfoffset_SEOBcomp.ipynb](https://gitlab.aei.uni-hannover.de/yifan.wang/eccentricity/-/blob/master/test/prod1_wfoffset_SEOBcomp.ipynb) (Note that SEOBNRE waveforms are different with others up to a coalescence phase offset).
 
 
 
