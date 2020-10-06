@@ -1,0 +1,7 @@
+build/
+dist/
+__pycache__/
+SEOBNRE
+pycbc_waveform_SEOBNRE.egg-info/
+test/.ipynb_checkpoints/
+test/prod1_wfoffset_SEOBcomp.pdf

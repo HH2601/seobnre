@@ -12,26 +12,14 @@
 #include <gsl/gsl_spline.h>
 #include "DIY_SEOBNRE_ALL.h"
 
-#ifdef newc
-#include <complex>
-#include <iostream>
-#include <iomanip>
-#include <fstream>
-#include <cstdlib>
-#include <cstdarg>
-#include <cstring>
-#include <cmath>
-using namespace std;
-#else
 #include <complex.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
 #include <math.h>
-#endif
 
 #define debugOutput 0
-#define outputh22 1
+#define outputh22 0
 #define outputOmega 1
 /* Function Declaration */
 
@@ -313,6 +301,7 @@ int XLALSimSEOBNRE(
                    const char      *jobtag
 )
 {
+    //printf("%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf\n",phiC,deltaT,m1SI,m2SI,fMin,e0,r,inc,spin1z,spin2z);
     /* If either spin > 0.6, model not available, exit */
     if ( spin1z > 0.6 || spin2z > 0.6 )
     {
@@ -1167,7 +1156,7 @@ int XLALSimSEOBNRE(
     /* TODO change to using XLALSimAddMode function to combine modes */
     /* For now, calculate -2Y22 * h22 + -2Y2-2 * h2-2 directly (all terms complex) */
     /* Compute spin-weighted spherical harmonics and generate waveform */
-    REAL8 coa_phase = 0.0;
+    REAL8 coa_phase = 0;
     
     MultSphHarmP = XLALSpinWeightedSphericalHarmonic( inc, coa_phase, -2, 2, 2 ); // -2Y22(inc, coa_phase)
     MultSphHarmM = XLALSpinWeightedSphericalHarmonic( inc, coa_phase, -2, 2, -2 ); // -2Y2-2(inc, coa_phase)
@@ -1175,8 +1164,8 @@ int XLALSimSEOBNRE(
     y_1 =   creal(MultSphHarmP) + creal(MultSphHarmM);
     y_2 =   cimag(MultSphHarmM) - cimag(MultSphHarmP) ;
     z1 = -  cimag(MultSphHarmM) - cimag(MultSphHarmP) ;
-    z2 =    creal(MultSphHarmM) - creal(MultSphHarmP);
-    
+    z2 =    creal(MultSphHarmM) - creal(MultSphHarmP);  
+
     for ( i = 0; i < (INT4)sigReVec->length; i++ )
     {
         REAL8 x1 = sigReVec->data[i];

@@ -61,6 +61,7 @@ const char * usage =
 "--e0 e0                    eccentricity at FMIN (default 0)\n"
 "--distance D               Distance in Mpc (default 100)\n"
 //"--axis AXIS                for PhenSpin: 'View' (default), 'TotalJ', 'OrbitalL'\n"
+"--longAscNodes             Longitude of ascending nodes, degenerate with the polarization angle, Omega in documentation\n"
 "--output                   Do not out put to file\n"
 "--outname FNAME            Output to file FNAME (default 'simulation.dat')\n"
 "--verbose                  If included, add verbose output\n"
@@ -95,6 +96,7 @@ GSParams *parse_args(unsigned int argc, char **argv) {
     params->s2x = 0.;
     params->s2y = 0.;
     params->s2z = 0.;
+    params->longAscNodes = 0.;
     params->verbose = 0; /* No verbosity */
     params->output = 1;
     strncpy(params->outname, "simulation.dat", 256); /* output to this file */
@@ -149,6 +151,8 @@ GSParams *parse_args(unsigned int argc, char **argv) {
             params->verbose = 1;
         } else if (strcmp(argv[i], "--jobtag") == 0) {
             strncpy(params->jobtag, argv[++i], 256);
+        } else if (strcmp(argv[i], "--longAscNodes") == 0) {
+            params->longAscNodes = atof(argv[++i]);
         } else {
             fprintf(stderr,"Error: invalid option: %s\n", argv[i]);
             goto fail;
@@ -208,46 +212,38 @@ int dump_convertTD(GSParams *params, REAL8TimeSeries *hplus, REAL8TimeSeries *hc
     return 0;
 }
 
-int main (int argc , char **argv) {
+void genwaveform (double * outhp,double * outhc, double * t0, int * datalength,\
+    double phiRef, double deltaT, double m1, double m2, double s1z, double s2z,\
+    double f_min, double e0, double distance, double inclination, double long_asc_nodes) {
 
-	FILE *f;
-
-    int start_time;
     REAL8TimeSeries *hplus = NULL;
     REAL8TimeSeries *hcross = NULL;
-    GSParams *params;
-
-    /* parse commandline */
-    params = parse_args(argc, argv);
+    int i=0;
     
-    /* generate waveform */
-    start_time = time(NULL);
-
+    m1 = m1 * LAL_MSUN_SI;
+    m2 = m2 * LAL_MSUN_SI;
+    distance = distance * 1.e6 * LAL_PC_SI;
     // in Panyi_elip.cpp 
-    XLALSimInspiralChooseTDWaveform(&hplus, &hcross, params->phiRef, 
-                    params->deltaT, params->m1, params->m2, params->s1x, 
-                    params->s1y, params->s1z, params->s2x, params->s2y, 
-                    params->s2z, params->f_min, params->e0, 
-                    params->distance, params->inclination, params->jobtag
+    XLALSimInspiralChooseTDWaveform(&hplus, &hcross, phiRef, 
+                    deltaT, m1, m2, 0, 
+                    0, s1z, 0, 0,  
+                    s2z, f_min, e0, 
+                    distance, inclination, long_asc_nodes, "None"
                     );
-          
-    if (params->verbose)
-        fprintf(stderr,"Generation took %.0f seconds\n",
-                difftime(time(NULL), start_time));
+    //printf("%d\n",hplus->data->length);
 
-    /* dump file */
-    if(params->output)
-    {
-      f = fopen(params->outname, "w");
-      dump_TD(f, hplus, hcross);
-      fclose(f);
-    }
-    else
-    {
-        output_waveform(hplus, hcross, params->ampPhase);
+    for (i=0;i<hplus->data->length;i++){
+        *(outhp+i) = hplus->data->data[i];
+        *(outhc+i) = hcross->data->data[i];
     }
 
-    return 1;
+    *(datalength) = hplus->data->length;
+    if(*(datalength)>100000)
+    fprintf(stderr,"ERROR: Data length exceeds the maximum allowed size\n");
+
+    * (t0) = XLALGPSGetREAL8(&(hplus->epoch));
+    //printf("t0 is %e, hplus epoch is %e, \n",* t0, XLALGPSGetREAL8(&(hplus->epoch)));
+
 }
 
 int output_waveform(REAL8TimeSeries * h_plus, REAL8TimeSeries * h_cross, int ampPhase)
@@ -333,6 +329,7 @@ int XLALSimInspiralChooseTDWaveform(
                                     REAL8 e0,                                   /**< eccentricity at starting GW frequency (Hz) */
                                     REAL8 r,                                    /**< distance of source (m) */
                                     REAL8 i,                                    /**< inclination of source (rad) */
+                                    REAL8 longAscNodes,                   /**< longitude of ascending nodes, degenerate with the polarization angle, Omega in documentation */
                                     char *jobtag
 )
 {
@@ -376,10 +373,68 @@ int XLALSimInspiralChooseTDWaveform(
         fprintf(stderr,"XLAL Warning - : unphysical e0 = %e.\n", e0);
     
     
+    REAL8 polariz=longAscNodes;
+    //polariz+=-LAL_PI/2.;
     
+
     /* Call the waveform driver routine */
     ret = XLALSimSEOBNRE(hplus, hcross, phiRef,
                          deltaT, m1, m2, f_min, e0, r, i, S1z, S2z, jobtag); // in current file
     
+    
+    if (polariz && (*hplus) && (*hcross) ) {
+      REAL8 tmpP,tmpC;
+      REAL8 cp=cos(2.*polariz);
+      REAL8 sp=sin(2.*polariz);
+      for (UINT4 idx=0;idx<(*hplus)->data->length;idx++) {
+        tmpP=(*hplus)->data->data[idx];
+        tmpC=(*hcross)->data->data[idx];
+        (*hplus)->data->data[idx] =cp*tmpP+sp*tmpC;
+        (*hcross)->data->data[idx]=cp*tmpC-sp*tmpP;
+      }
+    }
+    
     return ret;
+}
+
+int main (int argc , char **argv) {
+
+    FILE *f;
+
+    int start_time;
+    REAL8TimeSeries *hplus = NULL;
+    REAL8TimeSeries *hcross = NULL;
+    GSParams *params;
+
+    /* parse commandline */
+    params = parse_args(argc, argv);
+    
+    /* generate waveform */
+    start_time = time(NULL);
+
+    // in Panyi_elip.cpp 
+    XLALSimInspiralChooseTDWaveform(&hplus, &hcross, params->phiRef, 
+                    params->deltaT, params->m1, params->m2, params->s1x, 
+                    params->s1y, params->s1z, params->s2x, params->s2y, 
+                    params->s2z, params->f_min, params->e0, 
+                    params->distance, params->inclination, params->longAscNodes, params->jobtag
+                    );
+          
+    if (params->verbose)
+        fprintf(stderr,"Generation took %.0f seconds\n",
+                difftime(time(NULL), start_time));
+
+    /* dump file */
+    if(params->output)
+    {
+      f = fopen(params->outname, "w");
+      dump_TD(f, hplus, hcross);
+      fclose(f);
+    }
+    else
+    {
+        output_waveform(hplus, hcross, params->ampPhase);
+    }
+
+    return 1;
 }
